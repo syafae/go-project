@@ -1,0 +1,25 @@
+# Ignore the database directory
+/database
+./database/
+
+# Ignore Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Ignore vendor directory (if not using Go modules)
+vendor/
+
+# Ignore dependency directories
+Godeps/
+
+# Ignore IDE/editor specific files
+*.idea/
+*.vscode/
+*.swp
+
+# Ignore Go module files (if needed)
+go.sum
