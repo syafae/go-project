@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 )
 
 type Workout struct {
@@ -16,10 +17,10 @@ type Workout struct {
 type WorkoutEntry struct {
 	ID              int      `json:"id"`
 	ExerciseName    string   `json:"exercise_name"`
-	Reps            *int     `json:"reps"`
 	Sets            int      `json:"sets"`
-	Weight          *float64 `json:"weight"`
+	Reps            *int     `json:"reps"`
 	DurationSeconds *int     `json:"duration_seconds"`
+	Weight          *float64 `json:"weight"`
 	Notes           string   `json:"notes"`
 	OrderIndex      int      `json:"order_index"`
 }
@@ -28,6 +29,7 @@ type WorkoutStore interface {
 	GetWorkoutByID(id int64) (*Workout, error)
 	CreateWorkout(workout *Workout) (*Workout, error)
 	UpdateWorkout(*Workout) error
+	DeleteWorkout(int64) error
 }
 
 type postgressWorkoutStore struct {
@@ -80,23 +82,23 @@ func (pg *postgressWorkoutStore) CreateWorkout(workout *Workout) (*Workout, erro
 
 func (pg *postgressWorkoutStore) GetWorkoutByID(id int64) (*Workout, error) {
 	workout := &Workout{}
-	query := `SELECT title, description, duration_minutes, calories_burned
+	query := `SELECT id, title, description, duration_minutes, calories_burned
 				FROM workouts
 				WHERE id = $1
 			`
-	err := pg.db.QueryRow(query, id).Scan(&workout.Title, &workout.Description, &workout.DurationMinutes, &workout.CaloriesBurned)
+	err := pg.db.QueryRow(query, id).Scan(&workout.ID, &workout.Title, &workout.Description, &workout.DurationMinutes, &workout.CaloriesBurned)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
 	if err != nil {
+		fmt.Println("Mohammed")
 		return nil, err
 	}
 
 	// let's get the entries
-	entryQuery := `
-		SELECT id, exercise_name,sets, reps, duration_seconds,weight, notes, order_index
+	entryQuery := `SELECT id, exercise_name,sets, reps, duration_seconds,weight, notes, order_index
 		FROM workout_entries
 		WHERE workout_id = $1
 		ORDER BY order_index
@@ -128,7 +130,7 @@ func (pg *postgressWorkoutStore) GetWorkoutByID(id int64) (*Workout, error) {
 		workout.Entries = append(workout.Entries, entry)
 	}
 
-	return nil, nil
+	return workout, nil
 }
 
 func (pg *postgressWorkoutStore) UpdateWorkout(workout *Workout) error {
@@ -138,12 +140,11 @@ func (pg *postgressWorkoutStore) UpdateWorkout(workout *Workout) error {
 	}
 	defer tx.Rollback()
 
-	query := `
-	UPDATE workouts
+	query := `UPDATE workouts
 	SET title = $1, description = $2, duration_minutes = $3, calories_burned = $4
 	WHERE id = $5
 	`
-	result, err := tx.Exec(query, workout.ID)
+	result, err := tx.Exec(query, workout.Title, workout.Description, workout.DurationMinutes, workout.CaloriesBurned, workout.ID)
 	if err != nil {
 		return err
 	}
@@ -154,31 +155,57 @@ func (pg *postgressWorkoutStore) UpdateWorkout(workout *Workout) error {
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
 	}
+
 	//update the entries
-	for _, entry := range workout.Entries {
-		query := `
-		UPDATE workout_entries
-		SET exercise_name = $1, sets = $2, reps = $3, duration_seconds = $4, weight = $5, notes = $6, order_index = $7
-		WHERE id = $8
-		`
-		result, err := tx.Exec(query, entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, entry.OrderIndex, entry.ID)
-		if err != nil {
-			return err
-		}
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rowsAffected == 0 {
-			return sql.ErrNoRows
-		}
-	}
-	
-	// commit the transaction
-	err = tx.Commit()
+	_, err = tx.Exec(`DELETE FROM workout_entries WHERE workout_id = $1`, workout.ID)
 	if err != nil {
 		return err
 	}
 
-	return err
+	for _, entry := range workout.Entries {
+		query := `
+    INSERT INTO workout_entries (workout_id, exercise_name, sets, reps, duration_seconds, weight, notes, order_index)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `
+
+		_, err := tx.Exec(query,
+			workout.ID,
+			entry.ExerciseName,
+			entry.Sets,
+			entry.Reps,
+			entry.DurationSeconds,
+			entry.Weight,
+			entry.Notes,
+			entry.OrderIndex,
+		)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (pg *postgressWorkoutStore) DeleteWorkout(id int64) error {
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query := `DELETE from workouts WHERE id = $1`
+	result, err := pg.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return tx.Commit()
+
 }
