@@ -11,3 +11,15 @@ services:
     restart: unless-stopped
     volumes:
       - ./database/postgres_data:/var/lib/postgresql/data:rw
+  test-db:
+    image: postgres:15
+    container_name: workoutDB_test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    volumes:
+      - ./database/postgres_test_data:/var/lib/postgresql/data:rw

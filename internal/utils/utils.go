@@ -26,11 +26,11 @@ func WriteJSON(w http.ResponseWriter, staus int, data Envelope) error {
 func ReadIDParam(r *http.Request) (int64, error) {
 	paramsWorkoutID := chi.URLParam(r, "id")
 	if paramsWorkoutID == "" {
-		return 0, errors.New("Invalid id parameter")
+		return 0, errors.New("invalid id parameter")
 	}
 	workoutID, err := strconv.ParseInt(paramsWorkoutID, 10, 64)
 	if err != nil {
-		return 0, errors.New("Invalid ID parameter")
+		return 0, errors.New("invalid ID parameter")
 	}
 
 	return workoutID, nil
