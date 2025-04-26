@@ -16,7 +16,7 @@ type password struct {
 // User represents a user in the system.
 type User struct {
 	ID           int       `json:"id"`
-	UserName     string    `json:"name"`
+	UserName     string    `json:"username"`
 	Email        string    `json:"email"`
 	PasswordHash password  `json:"-"`
 	Bio          string    `json:"bio"`
@@ -65,7 +65,7 @@ func NewPostgresUserStore(db *sql.DB) *postgressUserStore {
 }
 
 func (pg *postgressUserStore) CreateUser(user *User) error {
-	query := `INSERT INTO users (name, email, password_hash, bio)
+	query := `INSERT INTO users (username, email, password_hash, bio)
 	          VALUES($1, $2, $3, $4)
 			  RETURNING id, created_at, updated_at`
 	err := pg.db.QueryRow(query, user.UserName, user.Email, user.PasswordHash.hash, user.Bio).
@@ -76,15 +76,15 @@ func (pg *postgressUserStore) CreateUser(user *User) error {
 	return nil
 }
 
-func (pg *postgressUserStore) GetUserByName(name string) (*User, error) {
-	query := `SELECT id, name, email, password_hash, bio, created_at, updated_at
+func (pg *postgressUserStore) GetUserByName(username string) (*User, error) {
+	query := `SELECT id, username, email, password_hash, bio, created_at, updated_at
 	          FROM users
-			  WHERE name = $1`
+			  WHERE username = $1`
 	user := &User{
 		PasswordHash: password{},
 	}
 	var hash []byte
-	err := pg.db.QueryRow(query, name).Scan(
+	err := pg.db.QueryRow(query, username).Scan(
 		&user.ID,
 		&user.UserName,
 		&user.Email,
@@ -105,7 +105,7 @@ func (pg *postgressUserStore) GetUserByName(name string) (*User, error) {
 
 func (pg *postgressUserStore) UpdateUser(user *User) error {
 	query := `UPDATE users 
-	          SET name = $1, email = $2, bio = $3, updated_at = CURRENT_TIMESTAMP 
+	          SET username = $1, email = $2, bio = $3, updated_at = CURRENT_TIMESTAMP 
 			  WHERE id = $4
 			  RETURNING updated_at`
 	result, err := pg.db.Exec(query, user.UserName, user.Email, user.Bio, user.ID)
