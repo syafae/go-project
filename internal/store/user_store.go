@@ -34,8 +34,8 @@ func (p *password) Set(password string) ([]byte, error) {
 	return hash, nil
 }
 
-func (p *password) Matches(hash []byte, password string) (bool, error) {
-	err := bcrypt.CompareHashAndPassword(hash, []byte(password))
+func (p *password) Matches(password string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword(p.hash, []byte(password))
 	if err != nil {
 		switch {
 		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
@@ -55,16 +55,16 @@ type UserStore interface {
 	UpdateUser(user *User) error
 }
 
-type postgressUserStore struct {
+type postgresUserStore struct {
 	db *sql.DB
 }
 
 // NewPostgresUserStore returns a new instance of the Postgres based user store.
-func NewPostgresUserStore(db *sql.DB) *postgressUserStore {
-	return &postgressUserStore{db: db}
+func NewPostgresUserStore(db *sql.DB) *postgresUserStore {
+	return &postgresUserStore{db: db}
 }
 
-func (pg *postgressUserStore) CreateUser(user *User) error {
+func (pg *postgresUserStore) CreateUser(user *User) error {
 	query := `INSERT INTO users (username, email, password_hash, bio)
 	          VALUES($1, $2, $3, $4)
 			  RETURNING id, created_at, updated_at`
@@ -76,7 +76,7 @@ func (pg *postgressUserStore) CreateUser(user *User) error {
 	return nil
 }
 
-func (pg *postgressUserStore) GetUserByName(username string) (*User, error) {
+func (pg *postgresUserStore) GetUserByName(username string) (*User, error) {
 	query := `SELECT id, username, email, password_hash, bio, created_at, updated_at
 	          FROM users
 			  WHERE username = $1`
@@ -103,7 +103,7 @@ func (pg *postgressUserStore) GetUserByName(username string) (*User, error) {
 	return user, nil
 }
 
-func (pg *postgressUserStore) UpdateUser(user *User) error {
+func (pg *postgresUserStore) UpdateUser(user *User) error {
 	query := `UPDATE users 
 	          SET username = $1, email = $2, bio = $3, updated_at = CURRENT_TIMESTAMP 
 			  WHERE id = $4

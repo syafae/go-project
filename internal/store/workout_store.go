@@ -32,12 +32,12 @@ type WorkoutStore interface {
 	DeleteWorkout(int64) error
 }
 
-type postgressWorkoutStore struct {
+type postgresWorkoutStore struct {
 	db *sql.DB
 }
 
-func NewPostgresWorkoutStore(db *sql.DB) *postgressWorkoutStore {
-	return &postgressWorkoutStore{db: db}
+func NewPostgresWorkoutStore(db *sql.DB) *postgresWorkoutStore {
+	return &postgresWorkoutStore{db: db}
 }
 
 //implement the functions of the interface for the postgress database
@@ -45,7 +45,7 @@ func NewPostgresWorkoutStore(db *sql.DB) *postgressWorkoutStore {
 //later on we can swap postgres with any relational database system and app does not care as
 // he knows only the interface
 
-func (pg *postgressWorkoutStore) CreateWorkout(workout *Workout) (*Workout, error) {
+func (pg *postgresWorkoutStore) CreateWorkout(workout *Workout) (*Workout, error) {
 	tx, err := pg.db.Begin()
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func (pg *postgressWorkoutStore) CreateWorkout(workout *Workout) (*Workout, erro
 	return workout, nil
 }
 
-func (pg *postgressWorkoutStore) GetWorkoutByID(id int64) (*Workout, error) {
+func (pg *postgresWorkoutStore) GetWorkoutByID(id int64) (*Workout, error) {
 	workout := &Workout{}
 	query := `SELECT id, title, description, duration_minutes, calories_burned
 				FROM workouts
@@ -133,7 +133,7 @@ func (pg *postgressWorkoutStore) GetWorkoutByID(id int64) (*Workout, error) {
 	return workout, nil
 }
 
-func (pg *postgressWorkoutStore) UpdateWorkout(workout *Workout) error {
+func (pg *postgresWorkoutStore) UpdateWorkout(workout *Workout) error {
 	tx, err := pg.db.Begin()
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func (pg *postgressWorkoutStore) UpdateWorkout(workout *Workout) error {
 	return tx.Commit()
 }
 
-func (pg *postgressWorkoutStore) DeleteWorkout(id int64) error {
+func (pg *postgresWorkoutStore) DeleteWorkout(id int64) error {
 	tx, err := pg.db.Begin()
 	if err != nil {
 		return err
