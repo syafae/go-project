@@ -7,6 +7,7 @@ import (
 
 type Workout struct {
 	ID              int            `json:"id"`
+	UserID          int            `json:"user_id"`
 	Title           string         `json:"title"`
 	Description     string         `json:"description"`
 	DurationMinutes int            `json:"duration_minutes"`
@@ -30,6 +31,7 @@ type WorkoutStore interface {
 	CreateWorkout(workout *Workout) (*Workout, error)
 	UpdateWorkout(*Workout) error
 	DeleteWorkout(int64) error
+	GetWorkoutOwnerID(id int64) (int, error)
 }
 
 type postgresWorkoutStore struct {
@@ -51,8 +53,8 @@ func (pg *postgresWorkoutStore) CreateWorkout(workout *Workout) (*Workout, error
 		return nil, err
 	}
 	defer tx.Rollback()
-	query := `INSERT INTO workouts (title, description, duration_minutes, calories_burned)
-	 VALUES($1,$2,$3,$4)
+	query := `INSERT INTO workouts (user_id,title, description, duration_minutes, calories_burned)
+	 VALUES($1,$2,$3,$4, $5)
 	 returning id
 	 `
 	err = tx.QueryRow(query, workout.Title, workout.Description, workout.DurationMinutes, workout.CaloriesBurned).Scan(&workout.ID)
@@ -67,7 +69,7 @@ func (pg *postgresWorkoutStore) CreateWorkout(workout *Workout) (*Workout, error
 				weight, notes, order_index)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 				returning id`
-		err = tx.QueryRow(query, workout.ID, entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, entry.OrderIndex).Scan(&entry.ID)
+		err = tx.QueryRow(query, workout.UserID, workout.ID, entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, entry.OrderIndex).Scan(&entry.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -208,4 +210,17 @@ func (pg *postgresWorkoutStore) DeleteWorkout(id int64) error {
 
 	return tx.Commit()
 
+}
+
+func (pg *postgresWorkoutStore) GetWorkoutOwnerID(workoutID int64) (int, error) {
+	var userID int
+	query := `SELECT user_id FROM workouts WHERE id = $1`
+	err := pg.db.QueryRow(query, workoutID).Scan(&userID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
 }

@@ -3,9 +3,11 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
+	"github.com/syafae/femProject/internal/middleware"
 	"github.com/syafae/femProject/internal/store"
 	"github.com/syafae/femProject/internal/utils"
 )
@@ -46,6 +48,12 @@ func (wh *WorkoutHandler) HandleCreateWorkout(w http.ResponseWriter, r *http.Req
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid request sent"})
 		return
 	}
+	currentUser := middleware.GetUser(r)
+	if currentUser == nil || currentUser.IsAnonymous() {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "unauthorized"})
+		return
+	}
+	workout.UserID = currentUser.ID
 	createdWorkout, err := wh.WorkoutStore.CreateWorkout(&workout)
 	if err != nil {
 		wh.Logger.Printf("ERRR:CreateWorkout %v", err)
@@ -103,6 +111,27 @@ func (wh *WorkoutHandler) HandleUpdateWorkoutByID(w http.ResponseWriter, r *http
 	if updatedWorkoutRequest.Entries != nil {
 		existingWorkout.Entries = updatedWorkoutRequest.Entries
 	}
+
+	currentUser := middleware.GetUser(r)
+	// Check if the user is authenticated
+	// and if the workout belongs to the user
+
+	if currentUser == nil || currentUser.IsAnonymous() {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "unauthorized"})
+		return
+	}
+	workoutOwner, err := wh.WorkoutStore.GetWorkoutOwnerID(workoutID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "workout not found"})
+			return
+		}
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
+	}
+	if workoutOwner != currentUser.ID {
+		utils.WriteJSON(w, http.StatusForbidden, utils.Envelope{"error": "forbidden"})
+		return
+	}
 	err = wh.WorkoutStore.UpdateWorkout(existingWorkout)
 	if err != nil {
 		wh.Logger.Printf("ERRR:UpdateWorkout %v", err)
@@ -121,7 +150,26 @@ func (wh *WorkoutHandler) HandleDeleteWorkoutByID(w http.ResponseWriter, r *http
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid workout id"})
 		return
 	}
+	currentUser := middleware.GetUser(r)
+	// Check if the user is authenticated
+	// and if the workout belongs to the user
 
+	if currentUser == nil || currentUser.IsAnonymous() {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "unauthorized"})
+		return
+	}
+	workoutOwner, err := wh.WorkoutStore.GetWorkoutOwnerID(workoutID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "workout not found"})
+			return
+		}
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
+	}
+	if workoutOwner != currentUser.ID {
+		utils.WriteJSON(w, http.StatusForbidden, utils.Envelope{"error": "forbidden"})
+		return
+	}
 	err = wh.WorkoutStore.DeleteWorkout(workoutID)
 	if err == sql.ErrNoRows {
 		wh.Logger.Printf("ERRR:DeleteWorkout %v", err)
